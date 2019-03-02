@@ -1,0 +1,204 @@
+* Emacs Essential Config
+Bean's essential zero dependency configuration for a new emacs installation.
+** Generate lisp file from this configuration
+Select text below and run ~eval-region~.
+#+BEGIN_SRC
+(require 'org)
+(org-babel-load-file (expand-file-name "emacs-bean-essentials.org" user-emacs-directory))
+#+END_SRC
+
+* Helper
+#+BEGIN_SRC emacs-lisp
+(defun bean--launch-command(command)
+  (interactive)
+  (call-process-shell-command
+   command
+   nil 0 nil
+   )
+  )
+#+END_SRC
+** use y/n instead of yes/no
+#+BEGIN_SRC emacs-lisp
+(defalias 'yes-or-no-p 'y-or-n-p)
+#+END_SRC
+
+** Run emacs server
+#+BEGIN_SRC emacs-lisp
+(load "server")
+(unless (server-running-p) (server-start))
+#+END_SRC
+** package install
+#+BEGIN_SRC emacs-lisp
+(require 'package)
+(add-to-list 'package-archives
+	     '("melpa" . "https://melpa.org/packages/"))
+(add-to-list 'package-archives
+	     '("melpa2" . "http://www.mirrorservice.org/sites/melpa.org/packages/"))
+(add-to-list 'package-archives
+	     '("melpa3" . "http://www.mirrorservice.org/sites/stable.melpa.org/packages/"))
+#+END_SRC
+
+* General shortcuts
+#+BEGIN_SRC emacs-lisp
+(global-set-key (kbd "<f5>") 'eval-buffer)
+#+END_SRC
+* Cursor
+#+BEGIN_SRC emacs-lisp
+(global-set-key (kbd "M-n")
+                (lambda () (interactive) (next-line 10)))
+
+(global-set-key (kbd "M-p")
+                (lambda () (interactive) (previous-line 10)))
+#+END_SRC
+* Font and display
+** Zoom text
+#+BEGIN_SRC emacs-lisp
+(global-set-key (kbd "C-+") 'text-scale-increase)
+(global-set-key (kbd "C--") 'text-scale-decrease)
+#+END_SRC
+
+** 80 chars line
+#+BEGIN_SRC emacs-lisp
+(setq-default header-line-format
+              (list " " (make-string 79 ?-) "|"))
+#+END_SRC
+
+** Show line numbering
+#+BEGIN_SRC emacs-lisp
+  (add-hook 'text-mode-hook 'linum-mode)
+  (add-hook 'prog-mode-hook 'linum-mode)
+  (add-hook 'text-mode-hook 'line-number-mode)
+  (add-hook 'prog-mode-hook 'line-number-mode)
+#+END_SRC
+* Window navigation
+#+BEGIN_SRC emacs-lisp
+  (global-set-key (kbd "C-.") 'other-window)
+  (global-set-key (kbd "C-,") 'other-window)
+  (global-set-key (kbd "C-x x") 'switch-to-last-buffer)
+  (global-set-key (kbd "<f12>") 'menu-bar-mode)
+#+END_SRC
+#+END_SRC
+** winner mode
+#+BEGIN_SRC emacs-lisp
+(when (fboundp 'winner-mode)
+      (winner-mode 1))
+#+END_SRC
+** Buffers
+#+BEGIN_SRC emacs-lisp
+  (defalias 'list-buffers 'ibuffer) ; make ibuffer default
+  (setq ido-separator "\n") ; show ido elements vertically
+
+  (global-set-key (kbd "M-l") 'ibuffer)
+  (global-set-key (kbd "C-x C-n") 'next-buffer)
+  (global-set-key (kbd "C-x C-p") 'previous-buffer)
+#+END_SRC
+
+** Recent files
+#+BEGIN_SRC emacs-lisp
+  (when (fboundp recentf-mode)
+    (recentf-mode 1)
+    (setq recentf-max-menu-items 25)
+    (global-set-key "\C-x\ \C-r" 'recentf-open-files))
+#+END_SRC
+* Text edit
+** Indentation
+#+BEGIN_SRC emacs-lisp
+  (defun indent-buffer ()
+    "Indent the currently visited buffer."
+    (interactive)
+    (indent-region (point-min) (point-max)))
+
+  (defun indent-region-or-buffer ()
+    "Indent a region if selected, otherwise the whole buffer."
+    (interactive)
+    (save-excursion
+      (if (region-active-p)
+          (progn
+            (indent-region (region-beginning) (region-end))
+            (message "Indented selected region."))
+        (progn
+          (indent-buffer)
+          (message "Indented buffer.")))))
+
+  (global-set-key (kbd "C-M-\\") 'indent-region-or-buffer)
+
+#+END_SRC
+* Search
+#+BEGIN_SRC emacs-lisp
+(setq isearch-allow-scroll t)
+#+END_SRC
+* Keyboard
+#+BEGIN_SRC emacs-lisp
+  (defun keyboard-ch()
+    (interactive)
+    (bean--launch-command "setxkbmap ch"))
+
+  (defun keyboard-us()
+    (interactive)
+    (bean--launch-command "setxkbmap us"))
+#+END_SRC
+
+** Make Capslock a Control key
+#+BEGIN_SRC emacs-lisp
+  (bean--launch-command "setxkbmap -option ctrl:nocaps")
+#+END_SRC
+** Enable us keyboard layout
+#+BEGIN_SRC emacs-lisp
+  (keyboard-us)
+#+END_SRC
+* Dired
+** Dired-x jump
+#+BEGIN_SRC emacs-lisp
+  ;; borrowed from dired-x 
+  (defun dired-jump (&optional other-window file-name)
+    "Jump to Dired buffer corresponding to current buffer.
+  If in a file, Dired the current directory and move to file's line.
+  If in Dired already, pop up a level and goto old directory's line.
+  In case the proper Dired file line cannot be found, refresh the dired
+  buffer and try again.
+  When OTHER-WINDOW is non-nil, jump to Dired buffer in other window.
+  When FILE-NAME is non-nil, jump to its line in Dired.
+  Interactively with prefix argument, read FILE-NAME."
+    (interactive
+     (list nil (and current-prefix-arg
+                    (read-file-name "Jump to Dired file: "))))
+    (cond
+     ((bound-and-true-p archive-subfile-mode)
+      (switch-to-buffer archive-superior-buffer))
+     ((bound-and-true-p tar-subfile-mode)
+      (switch-to-buffer tar-superior-buffer))
+     (t
+      ;; Expand file-name before `dired-goto-file' call:
+      ;; `dired-goto-file' requires its argument to be an absolute
+      ;; file name; the result of `read-file-name' could be
+      ;; an abbreviated file name (Bug#24409).
+      (let* ((file (or (and file-name (expand-file-name file-name))
+                       buffer-file-name))
+             (dir (if file (file-name-directory file) default-directory)))
+        (if (and (eq major-mode 'dired-mode) (null file-name))
+            (progn
+              (setq dir (dired-current-directory))
+              (dired-up-directory other-window)
+              (unless (dired-goto-file dir)
+                ;; refresh and try again
+                (dired-insert-subdir (file-name-directory dir))
+                (dired-goto-file dir)))
+          (if other-window
+              (dired-other-window dir)
+            (dired dir))
+          (if file
+              (or (dired-goto-file file)
+                  ;; refresh and try again
+                  (progn
+                    (dired-insert-subdir (file-name-directory file))
+                    (dired-goto-file file))
+                  ;; Toggle omitting, if it is on, and try again.
+                  ;; (when dired-omit-mode
+                  ;; (dired-omit-mode)
+                  ;; (dired-goto-file file))
+                  )))))))
+#+END_SRC
+** Dired config
+#+BEGIN_SRC emacs-lisp
+(global-set-key (kbd "C-x C-j") 'dired-jump)
+#+END_SRC
