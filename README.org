@@ -1,4 +1,7 @@
 * Emacs dotfiles
-These are snippets of my Emacs dotfiles
 
+How I do Emacs ...
+
+- emacs-bean-essentials.org :: minimal zero dependency configuration
+- emacs-settings.org :: Emacs configuration
 

@@ -1,5 +1,5 @@
 * Emacs Essential Config
-Bean's essential zero dependency configuration for a new emacs installation.
+My zero dependency configuration for a new emacs installation.
 ** Generate lisp file from this configuration
 Select text below and run ~eval-region~.
 #+BEGIN_SRC
