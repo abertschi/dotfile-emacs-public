@@ -1,0 +1,190 @@
+(use-package golden-ratio
+  :ensure t
+  :config (golden-ratio-mode 1)
+  )
+
+(use-package zenburn-theme
+  :ensure t)
+(load-theme 'zenburn t)
+
+(set-face-attribute 'default nil :height 115)
+
+;; https://raw.githubusercontent.com/camdez/goto-last-change.el/master/goto-last-change.el
+(use-package goto-last-change
+  :bind("C-x C-l" . goto-last-change)
+)
+
+(use-package expand-region
+  :ensure t
+  :bind ("C-M-h" . 'er/expand-region)
+  :bind ("C-M-g" . 'er/contract-region)
+  :config (progn))
+
+(global-set-key (kbd "C-M-p") 'beginning-of-defun)
+(global-set-key (kbd "C-M-n") 'end-of-defun)
+
+(add-hook 'emacs-lisp-hook
+          (lambda ()
+            (local-set-key (kbd "C-M-n") 'forward-list)
+            (local-set-key (kbd "C-M-p") 'backward-list)))
+
+
+;; (add-hook 'c-mode-hook
+;;           (lambda ()
+;;             (local-set-key (kbd "C-M-n") 'end-of-defun)
+;;             (local-set-key (kbd "C-M-p") 'beginning-of-defun)))
+
+
+;; (add-hook 'java-mode-hook
+;;           (lambda ()
+;;             (local-set-key (kbd "C-M-n") 'end-of-defun)
+;;             (local-set-key (kbd "C-M-p") 'beginning-of-defun)))
+
+(defun open-with (msg)
+  (interactive
+   "sopen with: [t]erminal, [f]ile explorer, [d]efault application, [p] type program, [b]rowser url: ")
+
+  (cond ((string= msg "t") (bean--launch-command
+                            (format "urxvt -e sh -c \"cd %s ; zsh\"" default-directory)))
+        ((string= msg "f") (bean--launch-command (format "xdg-open %s" default-directory)))
+        ((string= msg "d") (open-with-default nil))
+        ((string= msg "p")
+         (interactive)
+         (let ((command (format "%s \"%s\" &"
+                                (read-from-minibuffer "type program: ")
+                                (if (eq major-mode 'dired-mode)
+                                    (dired-get-file-for-visit)
+                                  buffer-file-name))))
+           (message command)
+           (bean--launch-command command)))))
+
+(defun open-with-default (arg)
+  (interactive "P")
+  (let* ((current-file-name
+          (if (eq major-mode 'dired-mode)
+              (dired-get-file-for-visit)
+            buffer-file-name))
+         (open (pcase system-type
+                 (`darwin "open")
+                 ((or `gnu `gnu/linux `gnu/kfreebsd) "xdg-open")))
+         (program (if (or arg (not open))
+                      (read-shell-command "Open current file with: ")
+                    open)))
+    (call-process program nil 0 nil current-file-name)))
+
+(recentf-mode 1)
+(setq recentf-max-menu-items 1000)
+(global-set-key "\C-x\ \C-r" 'recentf-open-files)
+
+(use-package helm
+  :ensure t
+  :config
+
+  (require 'helm-config)
+  (global-set-key (kbd "C-x b") 'helm-mini)
+  (global-set-key (kbd "M-l") 'helm-mini)
+  (setq helm-buffer-max-length nil)
+  (setq helm-mini-default-sources '(helm-source-buffers-list
+                                    helm-source-recentf
+                                    helm-source-bookmarks
+                                    helm-source-buffer-not-found))
+  (global-set-key (kbd "M-x") 'helm-M-x))
+
+(use-package helm-swoop
+  :ensure t
+  :config
+
+  ;; Change the keybinds to whatever you like :)
+  (global-set-key (kbd "M-i") 'helm-swoop)
+  (global-set-key (kbd "M-I") 'helm-swoop-back-to-last-point)
+  (global-set-key (kbd "C-c M-i") 'helm-multi-swoop)
+  (global-set-key (kbd "C-x M-i") 'helm-multi-swoop-all)
+  (global-set-key (kbd "C-M-i") 'helm-multi-swoop-projectile)
+
+  ;; When doing isearch, hand the word over to helm-swoop
+  (define-key isearch-mode-map (kbd "M-i") 'helm-swoop-from-isearch)
+  ;; From helm-swoop to helm-multi-swoop-all
+  (define-key helm-swoop-map (kbd "M-i") 'helm-multi-swoop-all-from-helm-swoop)
+  ;; When doing evil-search, hand the word over to helm-swoop
+  ;; (define-key evil-motion-state-map (kbd "M-i") 'helm-swoop-from-evil-search)
+
+  ;; Instead of helm-multi-swoop-all, you can also use helm-multi-swoop-current-mode
+  (define-key helm-swoop-map (kbd "M-m") 'helm-multi-swoop-current-mode-from-helm-swoop)
+
+  ;; Move up and down like isearch
+  (define-key helm-swoop-map (kbd "C-r") 'helm-previous-line)
+  (define-key helm-swoop-map (kbd "C-s") 'helm-next-line)
+  (define-key helm-multi-swoop-map (kbd "C-r") 'helm-previous-line)
+  (define-key helm-multi-swoop-map (kbd "C-s") 'helm-next-line)
+
+  ;; Save buffer when helm-multi-swoop-edit complete
+  (setq helm-multi-swoop-edit-save t)
+
+  ;; If this value is t, split window inside the current window
+  (setq helm-swoop-split-with-multiple-windows nil)
+
+  ;; Split direcion. 'split-window-vertically or 'split-window-horizontally
+  (setq helm-swoop-split-direction 'split-window-horizontally)
+
+  ;; If nil, you can slightly boost invoke speed in exchange for text color
+  ;; (setq helm-swoop-speed-or-color nil)
+
+  ;; ;; Go to the opposite side of line from the end or beginning of line
+  (setq helm-swoop-move-to-line-cycle t)
+
+  ;; Optional face for line numbers
+  ;; Face name is `helm-swoop-line-number-face`
+  (setq helm-swoop-use-line-number-face t)
+
+  ;; If you prefer fuzzy matching
+  ;; (setq helm-swoop-use-fuzzy-match t)
+  )
+
+;;; readme: https://github.com/magnars/multiple-cursors.el
+(use-package multiple-cursors
+  ;; :load-path "~/emacs.d/multiple-cursors.el/"
+  ;; :ensure multiple-cursors
+  :ensure t
+  :config
+  (global-set-key (kbd "C-S-c C-S-c") 'mc/edit-lines)
+  (global-set-key (kbd "C->") 'mc/mark-next-like-this)
+  (global-set-key (kbd "C-<") 'mc/mark-previous-like-this) 
+  (global-set-key (kbd "C-c C-;") 'mc/mark-all-like-this)
+  (define-key mc/keymap (kbd "<return>") nil)
+  )
+
+(use-package hungry-delete
+  :ensure t
+  :config
+  (global-hungry-delete-mode))
+
+(defun sudo-edit (&optional arg)
+  (interactive "P")
+  (if (or arg (not buffer-file-name))
+      (find-file (concat "/sudo:root@localhost:"
+                         (ido-read-file-name "Find file(as root): ")))
+    (find-alternate-file (concat "/sudo:root@localhost:" buffer-file-name))))
+
+(use-package dired-x
+  ;; :ensure t
+  :config (progn
+            (setq diredp-find-file-reuse-dir-buffer 1)
+            (setq diredp-toggle-find-file-reuse-dir 1)
+            ))
+(setq dired-listing-switches "-ahl --group-directories-first")
+
+(use-package magit
+  :ensure t
+  :init
+  :config
+  :bind ("C-x g" . magit-status)
+  :bind ("C-x M-g" . magit-dispatch-popup)
+  )
+
+(setq c-default-style "linux"
+      c-basic-offset 4)
+
+;; (setq c-default-style "java"
+;;       c-basic-offset 4)
+
+;; (define-key c-mode-base-map (kbd "RET") 'newline-and-indent)

@@ -1,34 +1,88 @@
 * Emacs Essential Config
-My zero dependency configuration for a new emacs installation.
+  Bean's essential zero dependency configuration for a new emacs installation.
+
 ** Generate lisp file from this configuration
-Select text below and run ~eval-region~.
-#+BEGIN_SRC
+   Select text below and run ~eval-region~.
+   #+BEGIN_SRC
 (require 'org)
-(org-babel-load-file (expand-file-name "emacs-bean-essentials.org" user-emacs-directory))
-#+END_SRC
+;;(org-babel-load-file (expand-file-name "emacs-bean-essentials.org" user-emacs-directory)
+(org-babel-load-file (buffer-file-name))
+   #+END_SRC
+
+* Better Defaults
+  #+BEGIN_SRC emacs-lisp
+  ;; Author: Phil Hagelberg
+  ;; URL: https://github.com/technomancy/better-defaults
+  (progn
+    (unless (fboundp 'helm-mode)
+      (ido-mode t)
+      (setq ido-enable-flex-matching t))
+
+    (unless (eq window-system 'ns)
+      (menu-bar-mode -1))
+    (when (fboundp 'tool-bar-mode)
+      (tool-bar-mode -1))
+    (when (fboundp 'scroll-bar-mode)
+      (scroll-bar-mode -1))
+    (when (fboundp 'horizontal-scroll-bar-mode)
+      (horizontal-scroll-bar-mode -1))
+
+    (autoload 'zap-up-to-char "misc"
+      "Kill up to, but not including ARGth occurrence of CHAR." t)
+
+    (require 'uniquify)
+    (setq uniquify-buffer-name-style 'forward)
+
+    (require 'saveplace)
+    (setq-default save-place t)
+
+    (global-set-key (kbd "M-/") 'hippie-expand)
+    (global-set-key (kbd "C-x C-b") 'ibuffer)
+    (global-set-key (kbd "M-z") 'zap-up-to-char)
+
+    (global-set-key (kbd "C-s") 'isearch-forward-regexp)
+    (global-set-key (kbd "C-r") 'isearch-backward-regexp)
+    (global-set-key (kbd "C-M-s") 'isearch-forward)
+    (global-set-key (kbd "C-M-r") 'isearch-backward)
+
+    (show-paren-mode 1)
+    (setq-default indent-tabs-mode nil)
+    (setq save-interprogram-paste-before-kill t
+          apropos-do-all t
+          mouse-yank-at-point t
+          require-final-newline t
+          visible-bell t
+          load-prefer-newer t
+          ediff-window-setup-function 'ediff-setup-windows-plain
+          save-place-file (concat user-emacs-directory "places")
+          backup-directory-alist `(("." . ,(concat user-emacs-directory
+                                                   "backups")))))
+
+
+  #+END_SRC
 
 * Helper
-#+BEGIN_SRC emacs-lisp
-(defun bean--launch-command(command)
-  (interactive)
-  (call-process-shell-command
-   command
-   nil 0 nil
-   )
-  )
-#+END_SRC
+  #+BEGIN_SRC emacs-lisp
+    (defun bean--launch-command(command)
+      (interactive)
+      (call-process-shell-command
+       command
+       nil 0 nil
+       )
+      )
+  #+END_SRC
 ** use y/n instead of yes/no
-#+BEGIN_SRC emacs-lisp
+   #+BEGIN_SRC emacs-lisp
 (defalias 'yes-or-no-p 'y-or-n-p)
-#+END_SRC
+   #+END_SRC
 
 ** Run emacs server
-#+BEGIN_SRC emacs-lisp
+   #+BEGIN_SRC emacs-lisp
 (load "server")
 (unless (server-running-p) (server-start))
-#+END_SRC
+   #+END_SRC
 ** package install
-#+BEGIN_SRC emacs-lisp
+   #+BEGIN_SRC emacs-lisp
 (require 'package)
 (add-to-list 'package-archives
 	     '("melpa" . "https://melpa.org/packages/"))
@@ -36,73 +90,215 @@ Select text below and run ~eval-region~.
 	     '("melpa2" . "http://www.mirrorservice.org/sites/melpa.org/packages/"))
 (add-to-list 'package-archives
 	     '("melpa3" . "http://www.mirrorservice.org/sites/stable.melpa.org/packages/"))
-#+END_SRC
+   #+END_SRC
 
 * General shortcuts
-#+BEGIN_SRC emacs-lisp
-(global-set-key (kbd "<f5>") 'eval-buffer)
-#+END_SRC
+  #+BEGIN_SRC emacs-lisp
+    (global-set-key (kbd "<f5>") 'eval-buffer)
+    (global-set-key (kbd "C-x C-,") 'beginning-of-buffer)
+    (global-set-key (kbd "C-x C-.") 'end-of-buffer)
+    (global-set-key (kbd "S-<f6>") 'query-replace)
+  #+END_SRC
 * Cursor
-#+BEGIN_SRC emacs-lisp
-(global-set-key (kbd "M-n")
-                (lambda () (interactive) (next-line 10)))
+  #+BEGIN_SRC emacs-lisp
+  (global-set-key (kbd "M-n")
+                  (lambda () (interactive) (next-line 10)))
 
-(global-set-key (kbd "M-p")
-                (lambda () (interactive) (previous-line 10)))
+  (global-set-key (kbd "M-p")
+                  (lambda () (interactive) (previous-line 10)))
+
+  (defun duplicate-current-line-or-region (arg)
+    "Duplicates the current line or region ARG times.
+    If there's no region, the current line will be duplicated. However, if
+    there's a region, all lines that region covers will be duplicated."
+    (interactive "p")
+    (let (beg end (origin (point)))
+      (if (and mark-active (> (point) (mark)))
+          (exchange-point-and-mark))
+      (setq beg (line-beginning-position))
+      (if mark-active
+          (exchange-point-and-mark))
+      (setq end (line-end-position))
+      (let ((region (buffer-substring-no-properties beg end)))
+        (dotimes (i arg)
+          (goto-char end)
+          (newline)
+          (insert region)
+          (setq end (point)))
+        (goto-char (+ origin (* (length region) arg) arg)))))
+  (global-set-key (kbd "C-c d") 'duplicate-current-line-or-region)
+
+  (defun move-line (n)
+    "Move the current line up or down by N lines."
+    (interactive "p")
+    (setq col (current-column))
+    (beginning-of-line) (setq start (point))
+    (end-of-line) (forward-char) (setq end (point))
+    (let ((line-text (delete-and-extract-region start end)))
+      (forward-line n)
+      (insert line-text)
+      ;; restore point to original column in moved line
+      (forward-line -1)
+      (forward-char col)))
+
+  (defun move-line-up (n)
+    "Move the current line up by N lines."
+    (interactive "p")
+    (move-line (if (null n) -1 (- n))))
+
+  (defun move-line-down (n)
+    "Move the current line down by N lines."
+    (interactive "p")
+    (move-line (if (null n) 1 n)))
+
+  (global-set-key (kbd "M-<up>") 'move-line-up)
+  (global-set-key (kbd "M-<down>") 'move-line-down)
+
+  #+END_SRC
+** goto-last-change
+   #+BEGIN_SRC emacs-lisp
+     ;;; goto-last-change.el --- Move point through buffer-undo-list positions
+
+     ;; Copyright © 2003 Kevin Rodgers
+
+     ;; Author: Kevin Rodgers <ihs_4664@yahoo.com>
+     ;; Created: 17 Jun 2003
+     ;; Version: 1.2.1
+     ;; Keywords: convenience
+     ;; Homepage: https://github.com/camdez/goto-last-change.el
+     (or (fboundp 'last)                     ; Emacs 20
+         (require 'cl))                      ; Emacs 19
+
+     (defvar goto-last-change-undo nil
+       "The `buffer-undo-list' entry of the previous \\[goto-last-change] command.")
+     (make-variable-buffer-local 'goto-last-change-undo)
+
+     ;;;###autoload
+     (defun goto-last-change (&optional mark-point minimal-line-distance)
+       "Set point to the position of the last change.
+     Consecutive calls set point to the position of the previous change.
+     With a prefix arg (optional arg MARK-POINT non-nil), set mark so \
+     \\[exchange-point-and-mark]
+     will return point to the current position."
+       (interactive "P")
+       (when (eq buffer-undo-list t)
+         (error "No undo information in this buffer"))
+       (when mark-point
+         (push-mark))
+       (unless minimal-line-distance
+         (setq minimal-line-distance 10))
+       (let (position
+             undo
+             (undo-list (if (and (eq this-command last-command)
+                                 goto-last-change-undo)
+                            (cdr (memq goto-last-change-undo buffer-undo-list))
+                          buffer-undo-list)))
+         (while (and undo-list
+                     (or (not position)
+                         (eql position (point))
+                         (and minimal-line-distance
+                              ;; The first invocation always goes to the last change, subsequent ones skip
+                              ;; changes closer to (point) then minimal-line-distance.
+                              (memq last-command '(goto-last-change
+                                                   goto-last-change-with-auto-marks))
+                              (< (count-lines (min position (point-max)) (point))
+                                 minimal-line-distance))))
+           (setq undo (car undo-list))
+           (cond ((and (consp undo) (integerp (car undo)) (integerp (cdr undo)))
+                  ;; (BEG . END)
+                  (setq position (cdr undo)))
+                 ((and (consp undo) (stringp (car undo))) ; (TEXT . POSITION)
+                  (setq position (abs (cdr undo))))
+                 ((and (consp undo) (eq (car undo) t))) ; (t HIGH . LOW)
+                 ((and (consp undo) (null (car undo)))
+                  ;; (nil PROPERTY VALUE BEG . END)
+                  (setq position (cdr (last undo))))
+                 ((and (consp undo) (markerp (car undo)))) ; (MARKER . DISTANCE)
+                 ((integerp undo))                         ; POSITION
+                 ((null undo))                             ; nil
+                 (t (error "Invalid undo entry: %s" undo)))
+           (setq undo-list (cdr undo-list)))
+         (cond (position
+                (setq goto-last-change-undo undo)
+                (goto-char (min position (point-max))))
+               ((and (eq this-command last-command)
+                     goto-last-change-undo)
+                (setq goto-last-change-undo nil)
+                (error "No further undo information"))
+               (t
+                (setq goto-last-change-undo nil)
+                (error "Buffer not modified")))))
+
+     (defun goto-last-change-with-auto-marks (&optional minimal-line-distance)
+       "Calls goto-last-change and sets the mark at only the first
+     invocations in a sequence of invocations."
+       (interactive "P")
+       (goto-last-change (not (or (eq last-command 'goto-last-change-with-auto-marks)
+                                  (eq last-command t)))
+                         minimal-line-distance))
+
+     (provide 'goto-last-change)
+     ;;; goto-last-change.el ends here
+
+   #+END_SRC
+** goto-last-change setup
+#+BEGIN_SRC emacs-lisp
+  (global-set-key (kbd "C-x C-l") 'goto-last-change)
 #+END_SRC
 * Font and display
 ** Zoom text
-#+BEGIN_SRC emacs-lisp
+   #+BEGIN_SRC emacs-lisp
 (global-set-key (kbd "C-+") 'text-scale-increase)
 (global-set-key (kbd "C--") 'text-scale-decrease)
-#+END_SRC
+   #+END_SRC
 
 ** 80 chars line
-#+BEGIN_SRC emacs-lisp
+   #+BEGIN_SRC emacs-lisp
 (setq-default header-line-format
               (list " " (make-string 79 ?-) "|"))
-#+END_SRC
+   #+END_SRC
 
 ** Show line numbering
-#+BEGIN_SRC emacs-lisp
-  (add-hook 'text-mode-hook 'linum-mode)
-  (add-hook 'prog-mode-hook 'linum-mode)
-  (add-hook 'text-mode-hook 'line-number-mode)
-  (add-hook 'prog-mode-hook 'line-number-mode)
-#+END_SRC
+   #+BEGIN_SRC emacs-lisp
+  ;; makes emacs slow
+  ;; (add-hook 'text-mode-hook 'linum-mode)
+  ;; (add-hook 'prog-mode-hook 'linum-mode)
+  ;; (add-hook 'text-mode-hook 'line-number-mode)
+  ;; (add-hook 'prog-mode-hook 'line-number-mode)
+   #+END_SRC
 * Window navigation
-#+BEGIN_SRC emacs-lisp
+  #+BEGIN_SRC emacs-lisp
   (global-set-key (kbd "C-.") 'other-window)
   (global-set-key (kbd "C-,") 'other-window)
   (global-set-key (kbd "C-x x") 'switch-to-last-buffer)
   (global-set-key (kbd "<f12>") 'menu-bar-mode)
-#+END_SRC
-#+END_SRC
+  #+END_SRC
+  #+END_SRC
 ** winner mode
-#+BEGIN_SRC emacs-lisp
+   #+BEGIN_SRC emacs-lisp
 (when (fboundp 'winner-mode)
       (winner-mode 1))
-#+END_SRC
+   #+END_SRC
 ** Buffers
-#+BEGIN_SRC emacs-lisp
+   #+BEGIN_SRC emacs-lisp
   (defalias 'list-buffers 'ibuffer) ; make ibuffer default
   (setq ido-separator "\n") ; show ido elements vertically
 
   (global-set-key (kbd "M-l") 'ibuffer)
   (global-set-key (kbd "C-x C-n") 'next-buffer)
   (global-set-key (kbd "C-x C-p") 'previous-buffer)
-#+END_SRC
+   #+END_SRC
 
 ** Recent files
-#+BEGIN_SRC emacs-lisp
+   #+BEGIN_SRC emacs-lisp
   (when (fboundp recentf-mode)
     (recentf-mode 1)
     (setq recentf-max-menu-items 25)
     (global-set-key "\C-x\ \C-r" 'recentf-open-files))
-#+END_SRC
+   #+END_SRC
 * Text edit
 ** Indentation
-#+BEGIN_SRC emacs-lisp
+   #+BEGIN_SRC emacs-lisp
   (defun indent-buffer ()
     "Indent the currently visited buffer."
     (interactive)
@@ -122,13 +318,18 @@ Select text below and run ~eval-region~.
 
   (global-set-key (kbd "C-M-\\") 'indent-region-or-buffer)
 
+   #+END_SRC
+** replace
+#+BEGIN_SRC emacs-lisp
+
+
 #+END_SRC
 * Search
-#+BEGIN_SRC emacs-lisp
+  #+BEGIN_SRC emacs-lisp
 (setq isearch-allow-scroll t)
-#+END_SRC
+  #+END_SRC
 * Keyboard
-#+BEGIN_SRC emacs-lisp
+  #+BEGIN_SRC emacs-lisp
   (defun keyboard-ch()
     (interactive)
     (bean--launch-command "setxkbmap ch"))
@@ -136,19 +337,19 @@ Select text below and run ~eval-region~.
   (defun keyboard-us()
     (interactive)
     (bean--launch-command "setxkbmap us"))
-#+END_SRC
+  #+END_SRC
 
 ** Make Capslock a Control key
-#+BEGIN_SRC emacs-lisp
+   #+BEGIN_SRC emacs-lisp
   (bean--launch-command "setxkbmap -option ctrl:nocaps")
-#+END_SRC
+   #+END_SRC
 ** Enable us keyboard layout
-#+BEGIN_SRC emacs-lisp
+   #+BEGIN_SRC emacs-lisp
   (keyboard-us)
-#+END_SRC
+   #+END_SRC
 * Dired
 ** Dired-x jump
-#+BEGIN_SRC emacs-lisp
+   #+BEGIN_SRC emacs-lisp
   ;; borrowed from dired-x 
   (defun dired-jump (&optional other-window file-name)
     "Jump to Dired buffer corresponding to current buffer.
@@ -197,8 +398,8 @@ Select text below and run ~eval-region~.
                   ;; (dired-omit-mode)
                   ;; (dired-goto-file file))
                   )))))))
-#+END_SRC
+   #+END_SRC
 ** Dired config
-#+BEGIN_SRC emacs-lisp
+   #+BEGIN_SRC emacs-lisp
 (global-set-key (kbd "C-x C-j") 'dired-jump)
-#+END_SRC
+   #+END_SRC
